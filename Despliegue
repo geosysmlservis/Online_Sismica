@@ -1,0 +1,2 @@
+gcloud builds submit   --tag us-east1-docker.pkg.dev/geosys-analitica-dev/online-repo/online-sismos .
+gcloud run deploy online-sismos   --image us-east1-docker.pkg.dev/geosys-analitica-dev/online-repo/online-sismos   --platform managed   --region us-east1   --allow-unauthenticated
