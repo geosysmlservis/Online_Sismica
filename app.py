@@ -10,10 +10,10 @@ from vertexai.preview.generative_models import GenerativeModel, Part
 import vertexai.preview.generative_models as generative_models
 
 # Config global
-GCP_PROJECT = "geosys-analitica-dev"
-GCP_REGION = "us-east1"
-CLOUD_TASK_QUEUE = "online-sismos"
-WORKER_URL = "https://online-sismos-439188544158.us-east1.run.app/process_single"
+GCP_PROJECT = "extrac-datos-geosys-production"
+GCP_REGION = "us-central1"
+CLOUD_TASK_QUEUE = "online-sismica"
+WORKER_URL = "" #pega la ruta de cloud run luego de hacer deploy junto con /process_single
 
 # Inicializar Vertex AI y logging
 init(project=GCP_PROJECT, location="us-central1")
@@ -135,6 +135,21 @@ Eres un sistema experto en extracción de información estructurada desde docume
                             15. **dominio_profundidad**:  
                             - Busca en “PROCESSING SEQUENCE” o “Processing sequence”  
                             - Si contiene la palabra “depth” → true, si no → false
+			
+			                16. **registrado_por**:
+                            - Busca en los campos con nombre como: "FIELD PARAMETERS", "ACQUISITION PARAMETERS", "CAMPOS DE ADQUISICIÓN" o "PARAMETROS DE ADQUISICIÓN".
+                            - Busca los datos que están presididos por las palabras clave: "RECORDED BY", "SHOT BY" , "ACQUIRED BY" o simplemente "ACQUIRED"
+                            - Formato: string, nombre propio de persona, compañia o empresa.
+                            - Si no se encuentra → null
+                            - no hagas diferencia entre letras mayúsculas o minúsculas.
+
+                            17. **fecha_registro**:
+                            - Busca en los campos con nombre como: "FIELD PARAMETERS", "ACQUISITION PARAMETERS", "CAMPOS DE ADQUISICIÓN" o "PARAMETROS DE ADQUISICIÓN".
+                            - Busca los datos que están presididos por las palabras clave: "RECORDING DETAILS", "RECORDING TECHNIQUE", "RECORDING DATE", "ACQUIRED" o simplemente "DATE".
+                            - Formato AAAA-MM-DD.
+                            - Si no tiene fecha de día, extrae la fecha tal y como lo encontraste (ej. 24-junio-2025 -> 2025-06-24; May. 25-> may 25)
+                                - Si el formato es ambiguo (ej. 05/06/97), analiza el contexto para determinar el orden.
+                            - No hagas diferencia entre minúsculas y mayúsculas.
 
                             FORMATO DE SALIDA:
 
@@ -155,7 +170,9 @@ Eres un sistema experto en extracción de información estructurada desde docume
                             "datum": null,
                             "station": null,
                             "velocidad_de_reemplazamiento": null,
-                            "dominio_profundidad": null
+                            "dominio_profundidad": null,
+                            "registrado_por": null,
+                            "fecha_registro": null
                             }}
 """  # Usa el prompt completo que ya tienes
 
@@ -192,7 +209,7 @@ def generate_from_document(document1, prompt, model_version):
 
 def save_to_bigquery(file_name, respuesta_texto):
     client = bigquery.Client()
-    table_id = f"{client.project}.online_sismos.resultados"
+    table_id = f"{client.project}.gf_sismica.resultados_sismica"
 
     try:
         client.get_table(table_id)
@@ -239,7 +256,7 @@ def enqueue_tasks():
         bucket_name, prefix = bucket_path.replace("gs://", "").split("/", 1)
         client = storage.Client()
         blobs = list(client.list_blobs(bucket_name, prefix=prefix))
-        blobs = [b.name for b in blobs if b.name.endswith((".pdf", ".jpg", ".png", ".tiff"))][:cantidad]
+        blobs = [b.name for b in blobs if b.name.endswith((".pdf", ".jpg", ".png", ".tiff", ".tif"))][:cantidad]
 
         task_client = tasks_v2.CloudTasksClient()
         parent = task_client.queue_path(GCP_PROJECT, GCP_REGION, CLOUD_TASK_QUEUE)
