@@ -1,0 +1,33 @@
+# cloudbuild.yaml
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: online-repo
+  _IMAGE_NAME: online-sismica
+  _SERVICE_NAME: online-sismica
+  _RUNTIME_SA: data-extraction-prod@extrac-datos-geosys-production.iam.gserviceaccount.com
+
+steps:
+#paso1 crear repo e imagen
+  - name: gcr.io/cloud-builders/docker
+    args: ['build','-t','$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_IMAGE_NAME','.']
+#paso2 subir imagen
+  - name: gcr.io/cloud-builders/docker
+    args: ['push','$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_IMAGE_NAME']
+#deploy cloud run
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      [
+        "run","deploy","$_SERVICE_NAME",
+        "--image","$_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_IMAGE_NAME",
+        "--region","$_REGION",
+        "--platform","managed",
+        "--allow-unauthenticated",
+        "--service-account","$_RUNTIME_SA"
+      ]
+
+images:
+  - $_REGION-docker.pkg.dev/$PROJECT_ID/$_AR_REPO/$_IMAGE_NAME
+
+options:
+  logging: CLOUD_LOGGING_ONLY
