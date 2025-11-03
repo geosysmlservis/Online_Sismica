@@ -13,7 +13,7 @@ import vertexai.preview.generative_models as generative_models
 GCP_PROJECT = "extrac-datos-geosys-production"
 GCP_REGION = "us-central1"
 CLOUD_TASK_QUEUE = "online-sismica"
-WORKER_URL = "" #pega la ruta de cloud run luego de hacer deploy junto con /process_single
+WORKER_URL = "https://online-sismica-386277896892.us-central1.run.app/process_single" #pega la ruta de cloud run luego de hacer deploy junto con /process_single
 
 # Inicializar Vertex AI y logging
 init(project=GCP_PROJECT, location="us-central1")
