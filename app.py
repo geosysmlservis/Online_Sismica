@@ -80,70 +80,25 @@ Eres un sistema experto en extracción de información estructurada desde docume
                                 - Tenga letras, símbolos o espacios entre los números
                             - Si no se encuentra un rango válido y etiquetado → asigna `null`
 
-
                             6. **tipo_procesamiento**:  
                             - Usa la lista {tipos_procesamiento_list}  
                             - Si no se encuentra coincidencia → null
 
-                            7. **lote**:  
-                            - Etiquetas: “BLOCK”, “LOTE”, “BLOCKS”  
-                            - Extrae directamente de la etiqueta  
-                            - Si es ambiguo o no aparece → null
-
-                            8. **analisis_velocidades**:  
-                            - true si:
-                                - Hay múltiples tablas pequeñas con decimales
-                                - O aparece la etiqueta “VELOCITY ANALYSIS”  
-                            - Si no → false
-
-                            9. **codigo**:  
+                            7. **codigo**:  
                             - Debe comenzar con "SG" o "SGP" seguido de 4 a 6 dígitos.  
                             - Rechaza códigos con guiones, espacios o letras en la parte numérica.  
                             - Ubicación típica: cerca del logo, código de barras, encabezado o pie de página.  
                             - Ejemplos válidos: SG00577, SGP21081  
                             - Ejemplos inválidos: RIB93-26 → null
 
-                            10. **intervalo_de_receptores**:  
-                            - Palabras clave: “station interval”, “receiver interval”, “group interval”  
-                            - Formato: número + unidad  
-                            - Si no se encuentra → null
-
-                            11. **intervalos_de_fuentes**:  
-                            - Palabras clave: “shot interval”, “SP interval”, “Source interval”  
-                            - Formato: número + unidad (ej. 25 m)  
-                            - Si no se encuentra → null
-
-                            12. **datum**:  
-                            - Etiquetas: “DATUM”, “DATUM LEVEL”, “DATUM ELEVATION”  
-                            - Suele estar alineado a la derecha de la etiqueta.  
-                            - Si es poco confiable → null
-
-                            13. **station**:  
-                            - Formato preferido: “200-51”  
-                            - Estrategia de extracción:
-                                1. Si existe la etiqueta “STATION”, localiza la lista numérica asociada directamente (tabla, fila o columna próxima) y extrae el primer y último número como rango.
-                                2. Si no se encuentra “STATION”:
-                                    - Identifica los valores extremos (primer y último) de las coordenadas en la gráfica de línea sísmica o tablas relacionadas con el trazado horizontal.
-                                    - Extrae esos dos valores como rango numérico.
-                            - Si no puede determinarse por ninguna de las vías → null
-
-                            14. **velocidad_de_reemplazamiento**:  
-                            - Palabras clave: “Replacement velocity”, “Correctional velocity”  
-                            - Formato: número + unidad (ej. 2000 m/s)  
-                            - Si no se encuentra → null
-
-                            15. **dominio_profundidad**:  
-                            - Busca en “PROCESSING SEQUENCE” o “Processing sequence”  
-                            - Si contiene la palabra “depth” → true, si no → false
-			
-			                16. **registrado_por**:
+			                8. **registrado_por**:
                             - Busca en los campos con nombre como: "FIELD PARAMETERS", "ACQUISITION PARAMETERS", "CAMPOS DE ADQUISICIÓN" o "PARAMETROS DE ADQUISICIÓN".
                             - Busca los datos que están presididos por las palabras clave: "RECORDED BY", "SHOT BY" , "ACQUIRED BY" o simplemente "ACQUIRED"
                             - Formato: string, nombre propio de persona, compañia o empresa.
                             - Si no se encuentra → null
                             - no hagas diferencia entre letras mayúsculas o minúsculas.
 
-                            17. **fecha_registro**:
+                            9. **fecha_registro**:
                             - Busca en los campos con nombre como: "FIELD PARAMETERS", "ACQUISITION PARAMETERS", "CAMPOS DE ADQUISICIÓN" o "PARAMETROS DE ADQUISICIÓN".
                             - Busca los datos que están presididos por las palabras clave: "RECORDING DETAILS", "RECORDING TECHNIQUE", "RECORDING DATE", "ACQUIRED" o simplemente "DATE".
                             - Formato AAAA-MM-DD.
@@ -162,15 +117,7 @@ Eres un sistema experto en extracción de información estructurada desde docume
                             "fecha": null,
                             "shot_point_range": null,
                             "tipo_procesamiento": null,
-                            "lote": null,
-                            "analisis_velocidades": null,
                             "codigo": null,
-                            "intervalo_de_receptores": null,
-                            "intervalos_de_fuentes": null,
-                            "datum": null,
-                            "station": null,
-                            "velocidad_de_reemplazamiento": null,
-                            "dominio_profundidad": null,
                             "registrado_por": null,
                             "fecha_registro": null
                             }}
