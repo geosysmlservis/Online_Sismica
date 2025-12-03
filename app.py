@@ -203,7 +203,7 @@ def save_metrics_to_bigquery(file_name, status, error_msg=None, tiempo_procesami
     Guarda métricas de procesamiento en BigQuery
     """
     client = bigquery.Client()
-    table_id = f"{client.project}.gf_pozos.metricas_procesamiento"
+    table_id = f"{client.project}.gf_sismica.metricas_procesamiento"
     
     try:
         client.get_table(table_id)
