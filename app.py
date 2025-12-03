@@ -3,6 +3,7 @@ import time
 import json
 import logging
 import pandas as pd
+from datetime import datetime
 from flask import Flask, request, jsonify
 from google.cloud import storage, bigquery, tasks_v2
 from vertexai import init
@@ -154,9 +155,9 @@ def generate_from_document(document1, prompt, model_version):
     )
     return responses.text.strip()
 
-def save_to_bigquery(file_name, respuesta_texto):
+def save_to_bigquery(file_name, respuesta_texto):    
     client = bigquery.Client()
-    table_id = f"{client.project}.gf_sismica.resultados_sismica"
+    table_id = f"{client.project}.gf_pozos.resultados_pozos"
 
     try:
         client.get_table(table_id)
@@ -164,6 +165,7 @@ def save_to_bigquery(file_name, respuesta_texto):
         schema = [
             bigquery.SchemaField("archivo", "STRING"),
             bigquery.SchemaField("respuesta_modelo", "STRING"),
+            bigquery.SchemaField("fecha_procesamiento", "TIMESTAMP"),  # NUEVO
         ]
         client.create_table(bigquery.Table(table_id, schema=schema))
 
@@ -174,16 +176,58 @@ def save_to_bigquery(file_name, respuesta_texto):
     existe = next(client.query(query, job_config=job_config).result()).total > 0
 
     if existe:
-        update_query = f"UPDATE {table_id} SET respuesta_modelo = @respuesta WHERE archivo = @archivo"
+        update_query = f"""
+            UPDATE {table_id} 
+            SET respuesta_modelo = @respuesta, 
+                fecha_procesamiento = @fecha 
+            WHERE archivo = @archivo
+        """
         update_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("archivo", "STRING", file_name),
                 bigquery.ScalarQueryParameter("respuesta", "STRING", respuesta_texto),
+                bigquery.ScalarQueryParameter("fecha", "TIMESTAMP", datetime.utcnow()),
             ]
         )
         client.query(update_query, job_config=update_config).result()
     else:
-        client.insert_rows_json(table_id, [{"archivo": file_name, "respuesta_modelo": respuesta_texto}])
+        client.insert_rows_json(table_id, [{
+            "archivo": file_name, 
+            "respuesta_modelo": respuesta_texto,
+            "fecha_procesamiento": datetime.utcnow().isoformat()
+        }])
+
+
+def save_metrics_to_bigquery(file_name, status, error_msg=None, tiempo_procesamiento=None, model_version=None):
+    """
+    Guarda métricas de procesamiento en BigQuery
+    """
+    client = bigquery.Client()
+    table_id = f"{client.project}.gf_pozos.metricas_procesamiento"
+    
+    try:
+        client.get_table(table_id)
+    except Exception:
+        schema = [
+            bigquery.SchemaField("archivo", "STRING"),
+            bigquery.SchemaField("fecha_procesamiento", "TIMESTAMP"),
+            bigquery.SchemaField("status", "STRING"),  # 'success' o 'error'
+            bigquery.SchemaField("error_mensaje", "STRING"),
+            bigquery.SchemaField("tiempo_procesamiento_seg", "FLOAT"),
+            bigquery.SchemaField("model_version", "STRING"),
+        ]
+        client.create_table(bigquery.Table(table_id, schema=schema))
+    
+    row = {
+        "archivo": file_name,
+        "fecha_procesamiento": datetime.utcnow().isoformat(),
+        "status": status,
+        "error_mensaje": error_msg,
+        "tiempo_procesamiento_seg": tiempo_procesamiento,
+        "model_version": model_version
+    }
+    
+    client.insert_rows_json(table_id, [row])
 
 # Flask
 app = Flask(__name__)
@@ -231,22 +275,55 @@ def enqueue_tasks():
 
 @app.route("/process_single", methods=["POST"])
 def process_single():
+    start_time = time.time()
+    data = request.get_json()
+    bucket_name = data["bucket_name"]
+    blob_name = data["blob_name"]
+    model_version = data.get("model_version", "gemini-2.5-flash")
+    
     try:
-        data = request.get_json()
-        bucket_name = data["bucket_name"]
-        blob_name = data["blob_name"]
-        model_version = data.get("model_version", "gemini-2.5-flash")
-
+        # Procesamiento
         file_bytes, mime_type = download_blob_as_bytes(bucket_name, blob_name)
         part = Part.from_data(mime_type=mime_type, data=file_bytes)
         prompt = build_prompt()
         respuesta = generate_from_document(part, prompt, model_version)
+        
+        # Guardar resultado
         save_to_bigquery(blob_name, respuesta)
-        return jsonify({"procesado": blob_name}), 200
+        
+        # Guardar métricas de éxito
+        tiempo_procesamiento = time.time() - start_time
+        save_metrics_to_bigquery(
+            file_name=blob_name,
+            status="success",
+            tiempo_procesamiento=tiempo_procesamiento,
+            model_version=model_version
+        )
+        
+        logging.info(f"✓ Procesado exitoso: {blob_name} en {tiempo_procesamiento:.2f}s")
+        return jsonify({
+            "procesado": blob_name,
+            "tiempo_seg": tiempo_procesamiento
+        }), 200
 
     except Exception as e:
-        logging.exception("[ERROR] process_single")
-        return jsonify({"error": str(e)}), 500
-
+        # Guardar métricas de error
+        tiempo_procesamiento = time.time() - start_time
+        error_msg = str(e)
+        
+        save_metrics_to_bigquery(
+            file_name=blob_name,
+            status="error",
+            error_msg=error_msg,
+            tiempo_procesamiento=tiempo_procesamiento,
+            model_version=model_version
+        )
+        
+        logging.exception(f"✗ Error procesando {blob_name}")
+        return jsonify({
+            "error": error_msg,
+            "archivo": blob_name
+        }), 500
+		
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
