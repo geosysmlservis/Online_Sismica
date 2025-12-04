@@ -157,7 +157,7 @@ def generate_from_document(document1, prompt, model_version):
 
 def save_to_bigquery(file_name, respuesta_texto):    
     client = bigquery.Client()
-    table_id = f"{client.project}.gf_sismica.resultados_sismica"
+    table_id = f"{client.project}.gf_sismica.extraccion_sismica"
 
     try:
         client.get_table(table_id)
